@@ -198,7 +198,8 @@ fn md_to_html(md: &str) -> String {
     let opts = Options::ENABLE_TABLES
         | Options::ENABLE_STRIKETHROUGH
         | Options::ENABLE_TASKLISTS
-        | Options::ENABLE_HEADING_ATTRIBUTES;
+        | Options::ENABLE_HEADING_ATTRIBUTES
+        | Options::ENABLE_MATH;
     let parser = Parser::new_ext(md, opts);
     let mut html_out = String::new();
     html::push_html(&mut html_out, parser);
@@ -702,6 +703,27 @@ fn escape_js(s: &str) -> String {
 fn is_allowed_update_url(url: &str) -> bool {
     url == "https://github.com/vorojar/md-preview/releases/latest"
         || url.starts_with("https://github.com/vorojar/md-preview/releases/tag/")
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn dollar_math_is_protected_from_markdown_escapes() {
+        let html = md_to_html(r"$\{x\}$");
+
+        assert!(html.contains(r#"<span class="math math-inline">\{x\}</span>"#));
+    }
+
+    #[test]
+    fn dollar_math_is_protected_from_markdown_emphasis() {
+        let html = md_to_html(r"$\bar{\mu}_{n}$ and $x_{n}$");
+
+        assert!(html.contains(r#"<span class="math math-inline">\bar{\mu}_{n}</span>"#));
+        assert!(html.contains(r#"<span class="math math-inline">x_{n}</span>"#));
+        assert!(!html.contains("<em>"));
+    }
 }
 
 /// Decode embedded icon.ico to an RGBA tao Icon for the window chrome.

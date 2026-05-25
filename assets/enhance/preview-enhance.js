@@ -26,6 +26,7 @@
     if (tag === 'CODE' || tag === 'PRE' || tag === 'KBD' || tag === 'SAMP' ||
         tag === 'SCRIPT' || tag === 'STYLE' || tag === 'TEXTAREA') return true;
     return hasClassInTree(el, 'katex') ||
+      hasClassInTree(el, 'math') ||
       hasClassInTree(el, 'mdp-mermaid') ||
       hasClassInTree(el, 'mdp-mermaid-error');
   }
@@ -97,6 +98,26 @@
 
   function enhanceMath(root) {
     if (!flags.math || !window.katex) return;
+    var mathNodes = root.querySelectorAll('.math.math-inline, .math.math-display');
+    Array.prototype.forEach.call(mathNodes, function(el) {
+      if (el.dataset.mdpMath === '1') return;
+      var source = el.textContent;
+      var display = el.classList.contains('math-display');
+      el.dataset.mdpMath = '1';
+      try {
+        window.katex.render(source, el, {
+          displayMode: display,
+          throwOnError: false,
+          strict: 'warn',
+          trust: false
+        });
+      } catch (err) {
+        el.className = 'mdp-math-error';
+        el.textContent = source;
+        el.title = err && err.message ? err.message : 'KaTeX render error';
+      }
+    });
+
     var walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, {
       acceptNode: function(node) {
         if (shouldSkipTextNode(node)) return NodeFilter.FILTER_REJECT;

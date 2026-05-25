@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.1.2
+
+- 修复 KaTeX 公式与 Markdown 转义/强调语法冲突的问题：`$\{x\}$`、`$\bar{\mu}_{n}$` 这类公式现在会在 Markdown 解析阶段被保护，再交给 KaTeX 渲染，避免反斜杠和 `_` 被 Markdown 先处理
+
 ## 1.1.1
 
 - 新增 GitHub Releases 更新检测：首屏渲染后异步检查最新正式版，发现新版本时在右上角工具栏显示更新按钮，点击打开 GitHub Release 页面
