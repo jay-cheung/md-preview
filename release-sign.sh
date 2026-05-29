@@ -20,6 +20,7 @@
 
 set -euo pipefail
 
+REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 TAG="${1:-}"
 if [ -z "$TAG" ]; then
   echo "usage: $0 <tag>  e.g. $0 v0.4.0" >&2
@@ -48,8 +49,7 @@ trap 'rm -rf "$WORK"' EXIT
 
 # Remove any stale sentinel from a previous run of the same tag, so a
 # waiter doesn't see an old DONE and think this one finished instantly.
-REPO_ROOT_PRE="$(cd "$(dirname "$0")" && pwd)"
-rm -f "$REPO_ROOT_PRE/target/.release-sign.done.$TAG" 2>/dev/null || true
+rm -f "$REPO_ROOT/target/.release-sign.done.$TAG" 2>/dev/null || true
 
 echo "[1/5] waiting for $TAG Release to expose $ASSET (poll 15s, up to 15min)..."
 for i in $(seq 1 60); do
@@ -89,7 +89,6 @@ cp "$SIGNED" "$WORK/$ASSET"
 gh release upload "$TAG" "$WORK/$ASSET" -R "$REPO" --clobber
 
 echo "[5/5] deploying stapled dmg + .app locally..."
-REPO_ROOT="$(cd "$(dirname "$0")" && pwd)"
 mkdir -p "$REPO_ROOT/target"
 
 # Keep a copy of the signed dmg in target/ so it's visible in the repo checkout.
@@ -127,7 +126,6 @@ echo "Release: https://github.com/$REPO/releases/tag/$TAG"
 # pipeline (or me in an interactive session) polls for file existence — no
 # regex against log timestamps, no mv of a live log. Removed at the top of
 # the next run so stale sentinels don't trigger false positives.
-REPO_ROOT="$(cd "$(dirname "$0")" && pwd)"
 SENTINEL="$REPO_ROOT/target/.release-sign.done.$TAG"
 touch "$SENTINEL"
 echo "    sentinel: $SENTINEL"
