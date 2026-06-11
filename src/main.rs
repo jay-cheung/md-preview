@@ -1231,6 +1231,8 @@ mod tests {
         assert!(page.contains("e.isComposing"));
         assert!(page.contains("focusFindInput"));
         assert!(page.contains("body.empty .toolbar.has-update"));
+        assert!(page.contains("bindAnchorNavigation"));
+        assert!(page.contains("event.target.closest('#preview a[href]')"));
     }
 
     #[test]

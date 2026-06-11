@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.1.16
+
+- Fixed in-document anchor clicks when a Markdown file has a local `<base href>` for relative assets. Table-of-contents links such as `[需求概述](#需求概述)` now scroll inside the preview instead of being treated as file navigation.
+- Added a Playwright regression check for encoded Chinese anchor links with a `file://` base URL.
+
 ## 1.1.15
 
 - Fixed in-document anchor links by automatically generating stable heading IDs, including Chinese headings such as `## 需求概述`, while preserving explicit `{#id}` heading attributes.
