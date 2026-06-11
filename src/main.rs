@@ -522,6 +522,7 @@ fn build_page(
     flags: EnhanceFlags,
     s: &Strings,
     empty: bool,
+    native_updater: bool,
 ) -> String {
     let body_class = if empty { "empty" } else { "" };
     let base_tag = base_href
@@ -743,6 +744,8 @@ body.editing #btn-print {{ display: none; }}
 	  var findClose = document.getElementById('find-close');
 	  var ta = document.getElementById('editor');
 	  var dirty = false;
+	  var composingFind = false;
+	  var pendingFindTimer = 0;
 
 	  btnOpen.innerHTML = ICON_OPEN;
 	  btnSearch.innerHTML = ICON_SEARCH;
@@ -780,14 +783,33 @@ body.editing #btn-print {{ display: none; }}
 	    document.body.classList.remove('finding');
 	    findInput.value = '';
 	    findState.textContent = '';
+	    if (pendingFindTimer) {{ clearTimeout(pendingFindTimer); pendingFindTimer = 0; }}
 	    var sel = window.getSelection && window.getSelection();
 	    if (sel && sel.removeAllRanges) sel.removeAllRanges();
+	  }}
+	  function focusFindInput() {{
+	    if (!document.body.classList.contains('finding')) return;
+	    if (document.activeElement === findInput) return;
+	    try {{
+	      findInput.focus({{ preventScroll: true }});
+	    }} catch (_) {{
+	      findInput.focus();
+	    }}
 	  }}
 	  function runFind(backward) {{
 	    var q = findInput.value;
 	    if (!q) {{ findState.textContent = ''; return; }}
+	    var hadFocus = document.activeElement === findInput;
 	    var found = window.find ? window.find(q, false, !!backward, true, false, false, false) : false;
 	    findState.textContent = found ? '' : '0';
+	    if (hadFocus) setTimeout(focusFindInput, 0);
+	  }}
+	  function scheduleFind() {{
+	    if (pendingFindTimer) clearTimeout(pendingFindTimer);
+	    pendingFindTimer = setTimeout(function() {{
+	      pendingFindTimer = 0;
+	      if (!composingFind) runFind(false);
+	    }}, 80);
 	  }}
   // Grow textarea height to its content so the page (html) owns the sole
   // scrollbar; avoids the double-scrollbar you see if textarea keeps its
@@ -839,8 +861,14 @@ body.editing #btn-print {{ display: none; }}
 	      window.ipc.postMessage('open-recent:' + recentBtn.getAttribute('data-recent-index'));
 	    }}
 	  }});
-	  findInput.addEventListener('input', function() {{ runFind(false); }});
+	  findInput.addEventListener('compositionstart', function() {{ composingFind = true; }});
+	  findInput.addEventListener('compositionend', function() {{ composingFind = false; scheduleFind(); }});
+	  findInput.addEventListener('input', function(e) {{
+	    if (composingFind || e.isComposing) return;
+	    scheduleFind();
+	  }});
 	  findInput.addEventListener('keydown', function(e) {{
+	    if (composingFind || e.isComposing) return;
 	    if (e.key === 'Enter') {{ e.preventDefault(); runFind(e.shiftKey); }}
 	    if (e.key === 'Escape') {{ e.preventDefault(); hideFind(); }}
 	  }});
@@ -979,7 +1007,7 @@ window.__mdPreviewInstallUpdateCheck({{
         search_placeholder = s.search_placeholder,
         btn_update_js = escape_js(s.btn_update),
         app_version = update_current_version(),
-        native_updater = cfg!(any(target_os = "macos", target_os = "windows")),
+        native_updater = native_updater,
         body_class = body_class,
         needs_math = flags.math,
         needs_mermaid = flags.mermaid,
@@ -1077,6 +1105,7 @@ mod tests {
             EnhanceFlags::default(),
             &strings,
             false,
+            true,
         );
 
         assert!(page.contains("document.addEventListener('contextmenu'"));
@@ -1089,6 +1118,10 @@ mod tests {
         assert!(page.contains("ta.focus({ preventScroll: true })"));
         assert!(page.contains("window.__setEmptyPreview"));
         assert!(page.contains("releases?per_page=20"));
+        assert!(page.contains("nativeUpdater: true"));
+        assert!(page.contains("compositionstart"));
+        assert!(page.contains("e.isComposing"));
+        assert!(page.contains("focusFindInput"));
         assert!(page.contains("body.empty .toolbar.has-update"));
     }
 
@@ -1102,11 +1135,13 @@ mod tests {
             EnhanceFlags::default(),
             &strings,
             false,
+            false,
         );
 
         assert!(page.contains("mdp-table-wrap"));
         assert!(page.contains("width: min(calc(100vw - 64px), 1280px)"));
         assert!(page.contains("if(window.__enhancePreview)window.__enhancePreview();"));
+        assert!(page.contains("nativeUpdater: false"));
     }
 
     #[test]
@@ -1368,7 +1403,7 @@ mod macos_updater {
     use objc2::msg_send;
     use objc2::runtime::{AnyClass, AnyObject, Bool};
     use std::ffi::{c_char, c_void, CStr, CString};
-    use std::path::PathBuf;
+    use std::path::{Path, PathBuf};
     use std::sync::OnceLock;
 
     static CONTROLLER: OnceLock<usize> = OnceLock::new();
@@ -1392,6 +1427,52 @@ mod macos_updater {
         CString::new(path.to_string_lossy().as_bytes()).ok()
     }
 
+    fn app_bundle_for_exe_path(exe: &Path) -> Option<PathBuf> {
+        exe.ancestors()
+            .find(|path| {
+                path.extension()
+                    .and_then(|ext| ext.to_str())
+                    .map(|ext| ext.eq_ignore_ascii_case("app"))
+                    .unwrap_or(false)
+            })
+            .map(Path::to_path_buf)
+    }
+
+    fn is_applications_bundle(bundle: &Path, home: Option<&Path>) -> bool {
+        let Some(parent) = bundle.parent() else {
+            return false;
+        };
+        if parent == Path::new("/Applications") {
+            return true;
+        }
+        home.map(|home| parent == home.join("Applications"))
+            .unwrap_or(false)
+    }
+
+    fn allow_non_applications_updater() -> bool {
+        std::env::var("MD_PREVIEW_ALLOW_NON_APPLICATIONS_UPDATER")
+            .map(|value| value == "1")
+            .unwrap_or(false)
+    }
+
+    pub fn can_install_updates() -> bool {
+        if bundled_framework_path().is_none() {
+            return false;
+        }
+        if allow_non_applications_updater() {
+            return true;
+        }
+
+        let Some(exe) = std::env::current_exe().ok() else {
+            return false;
+        };
+        let Some(bundle) = app_bundle_for_exe_path(&exe) else {
+            return false;
+        };
+        let home = std::env::var_os("HOME").map(PathBuf::from);
+        is_applications_bundle(&bundle, home.as_deref())
+    }
+
     fn load_framework() -> bool {
         if FRAMEWORK_HANDLE.get().is_some() {
             return true;
@@ -1410,6 +1491,9 @@ mod macos_updater {
     pub fn start() -> bool {
         if CONTROLLER.get().is_some() {
             return true;
+        }
+        if !can_install_updates() {
+            return false;
         }
         if !load_framework() {
             return false;
@@ -1449,6 +1533,41 @@ mod macos_updater {
             let _: () = msg_send![controller, checkForUpdates: Option::<&AnyObject>::None];
         }
         true
+    }
+
+    #[cfg(test)]
+    mod tests {
+        use super::*;
+        use std::path::Path;
+
+        #[test]
+        fn finds_bundle_from_executable_path() {
+            let bundle = app_bundle_for_exe_path(Path::new(
+                "/Applications/MD Preview.app/Contents/MacOS/md-preview",
+            ));
+
+            assert_eq!(bundle, Some(PathBuf::from("/Applications/MD Preview.app")));
+        }
+
+        #[test]
+        fn allows_system_and_user_applications_locations() {
+            assert!(is_applications_bundle(
+                Path::new("/Applications/MD Preview.app"),
+                None,
+            ));
+            assert!(is_applications_bundle(
+                Path::new("/Users/me/Applications/MD Preview.app"),
+                Some(Path::new("/Users/me")),
+            ));
+            assert!(!is_applications_bundle(
+                Path::new("/Volumes/MD Preview/MD Preview.app"),
+                Some(Path::new("/Users/me")),
+            ));
+            assert!(!is_applications_bundle(
+                Path::new("/Users/me/Downloads/MD Preview.app"),
+                Some(Path::new("/Users/me")),
+            ));
+        }
     }
 }
 
@@ -1587,6 +1706,21 @@ fn start_native_updater() -> bool {
 }
 
 #[cfg(target_os = "macos")]
+fn native_updater_enabled() -> bool {
+    macos_updater::can_install_updates()
+}
+
+#[cfg(target_os = "windows")]
+fn native_updater_enabled() -> bool {
+    true
+}
+
+#[cfg(not(any(target_os = "macos", target_os = "windows")))]
+fn native_updater_enabled() -> bool {
+    false
+}
+
+#[cfg(target_os = "macos")]
 fn check_native_updates(
     _download_url: Option<&str>,
     _digest: Option<&str>,
@@ -1655,6 +1789,7 @@ fn main() {
     let event_loop: EventLoop<UserEvent> = EventLoopBuilder::with_user_event().build();
     install_macos_edit_menu();
     let proxy = event_loop.create_proxy();
+    let native_updater_enabled = native_updater_enabled();
 
     let title = initial_file
         .as_ref()
@@ -1677,7 +1812,11 @@ fn main() {
         .build(&event_loop)
         .expect("failed to build window");
     bench_log("window_built");
-    let native_updater_available = start_native_updater();
+    let native_updater_available = if native_updater_enabled {
+        start_native_updater()
+    } else {
+        false
+    };
     if bench && native_updater_available {
         bench_log("native_updater_started");
     }
@@ -1702,6 +1841,7 @@ fn main() {
                     EnhanceFlags::default(),
                     &strings,
                     true,
+                    native_updater_enabled,
                 )
             },
             |raw| {
@@ -1715,6 +1855,7 @@ fn main() {
                     initial_flags,
                     &strings,
                     false,
+                    native_updater_enabled,
                 )
             },
         ),
@@ -1725,6 +1866,7 @@ fn main() {
             EnhanceFlags::default(),
             &strings,
             true,
+            native_updater_enabled,
         ),
     };
 

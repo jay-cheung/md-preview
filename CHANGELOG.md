@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.1.14
+
+- Fixed in-preview search with Chinese IME input by deferring search while text composition is active and restoring focus after native find updates the selection.
+- Made macOS in-app updates use Sparkle only when the app is installed in `/Applications` or `~/Applications`; launches from DMG, Downloads, or other transient locations now fall back to the GitHub download page instead of failing during install.
+
 ## 1.1.13
 
 - Improved wide Markdown tables: multi-column tables now expand beyond the reading column on desktop and scroll horizontally when needed, avoiding cramped vertical headers and over-wrapped cells.

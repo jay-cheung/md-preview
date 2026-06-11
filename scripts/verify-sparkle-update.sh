@@ -25,7 +25,7 @@ test -d "$FRAMEWORK/Updater.app"
 /usr/libexec/PlistBuddy -c 'Print :SUPublicEDKey' "$PLIST" | grep -qx 'fstkwGnjUNSrHFW4oq3LpBMQ1dhh9lQtax5K7nI0uoQ='
 /usr/libexec/PlistBuddy -c 'Print :SUEnableAutomaticChecks' "$PLIST" | grep -qx 'true'
 
-BENCH_OUTPUT="$(MD_PREVIEW_BENCH=1 "$APP/Contents/MacOS/md-preview" 2>&1)"
+BENCH_OUTPUT="$(MD_PREVIEW_BENCH=1 MD_PREVIEW_ALLOW_NON_APPLICATIONS_UPDATER=1 "$APP/Contents/MacOS/md-preview" 2>&1)"
 grep -q 'native_updater_started' <<<"$BENCH_OUTPUT"
 
 if [ -f target/MD-Preview-macOS-universal.dmg ]; then
