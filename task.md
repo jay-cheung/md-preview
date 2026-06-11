@@ -62,8 +62,8 @@
 命令：curl -fsSL https://github.com/vorojar/md-preview/releases/download/v1.1.16/appcast.xml
 结果：通过。线上 appcast 指向 MD Preview 1.1.16、v1.1.16 macOS DMG，并包含 sparkle:edSignature。
 
-命令：下载 v1.1.15 DMG 到 /tmp/md-preview-update-test.qD1lKw，复制旧版 App，并以 MD_PREVIEW_ALLOW_NON_APPLICATIONS_UPDATER=1 启动。
-结果：通过。旧版临时副本路径：/tmp/md-preview-update-test.qD1lKw/MD Preview 1.1.15.app；版本确认为 1.1.15；用于肉眼点击更新到 1.1.16。
+命令：下载 v1.1.15 DMG 到 /tmp/md-preview-update-test.qD1lKw，复制旧版 App，并用 open -n --env MD_PREVIEW_ALLOW_NON_APPLICATIONS_UPDATER=1 启动。
+结果：通过。旧版临时副本路径：/tmp/md-preview-update-test.qD1lKw/MD Preview 1.1.15.app；版本确认为 1.1.15；进程 PID 782；用于肉眼点击更新到 1.1.16。
 ```
 
 ## 风险和假设
