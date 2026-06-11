@@ -19,8 +19,8 @@
 - [x] 从 DMG、Downloads 或其他非安装路径运行时，更新按钮回退到 GitHub Release 下载页。
 - [x] `cargo test` 通过。
 - [x] `./scripts/verify.sh` 通过。
-- [ ] `v1.1.14` GitHub Release 完成，Release asset 包含 macOS DMG、Windows EXE、Linux tarball、`appcast.xml`。
-- [ ] `./release-sign.sh v1.1.14` 完成，macOS DMG 和内层 app 已签名、公证、staple。
+- [x] `v1.1.14` GitHub Release 完成，Release asset 包含 macOS DMG、Windows EXE、Linux tarball、`appcast.xml`。
+- [x] `./release-sign.sh v1.1.14` 完成，macOS DMG 和内层 app 已签名、公证、staple。
 
 ## 执行记录
 
@@ -39,9 +39,21 @@
 
 命令：./scripts/verify.sh
 结果：通过。guard、cargo test、macOS Sparkle 验证、Windows self-update 验证、iOS build/parse、Android debug/release、mobile renderer/release readiness 均通过。
+
+命令：GitHub Actions / Release v1.1.14
+结果：通过。Release workflow success；Release assets 包含 `MD-Preview-macOS-universal.dmg`、`MD-Preview-windows-x64.exe`、`MD-Preview-linux-x64.tar.gz`。
+
+命令：./release-sign.sh v1.1.14
+结果：通过。macOS DMG 和内层 app 已签名、公证、staple；签名后的 DMG 已上传覆盖 Release asset；`appcast.xml` 已生成并上传；本地 `target/MD Preview.app` 和 `/Applications/MD Preview.app` 已替换。
+
+命令：xcrun stapler validate target/MD-Preview-macOS-universal.dmg；codesign --verify --deep --strict --verbose=2 'target/MD Preview.app'；spctl -a -t open --context context:primary-signature target/MD-Preview-macOS-universal.dmg
+结果：通过。DMG staple 有效，app 签名有效，Gatekeeper primary-signature 评估通过。
+
+命令：curl https://github.com/vorojar/md-preview/releases/latest/download/appcast.xml
+结果：通过。Sparkle appcast 指向 `MD Preview 1.1.14` 和 `v1.1.14/MD-Preview-macOS-universal.dmg`。
 ```
 
 ## 风险和假设
 
 - macOS 更新问题来自用户口述，暂无具体 Sparkle 错误弹窗或日志；本次按最常见的 DMG/非安装路径运行导致安装失败处理。
-- 签名和 GitHub Release 结果将在 tag push 后由 release workflow 与 `release-sign.sh` 继续补充。
+- GitHub Actions 当前有 Node.js 20 deprecation annotation，未影响本次发布；后续需要在 2026-09-16 前处理 action runtime 升级。
