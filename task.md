@@ -1,4 +1,80 @@
-# 当前任务：发布签名链路修复
+# 当前任务：iOS TestFlight/App Store 发布前准备
+
+## 目标
+
+- 尽量完成 MD Preview iOS 版本发布前的本机准备工作。
+- 将 iOS 版本号对齐到当前 mobile release 线。
+- 验证 iOS 构建、归档、模拟器安装启动和移动端渲染。
+- 明确剩余阻塞项：真机连接、iOS 签名凭据、App Store Connect 凭据。
+
+## 非目标
+
+- 不在 ASC 未登录、签名凭据缺失、真机不可用时强行上传 TestFlight。
+- 不直接提交 App Store 审核；正式提交需要额外确认、metadata 和截图。
+- 不修改 Android 发布配置。
+
+## 验收场景
+
+- [x] iOS `MARKETING_VERSION` 对齐到 `1.0.7`，`CURRENT_PROJECT_VERSION` 对齐到 `8`。
+- [x] iOS project generation 成功。
+- [x] iOS simulator build 成功，并可安装启动到 iPhone 17 Pro Simulator。
+- [x] 首屏截图确认 app 启动到空状态，没有崩溃或明显遮挡。
+- [x] iOS generic Release archive 在 `CODE_SIGNING_ALLOWED=NO` 下成功，证明代码和 archive 路径可用。
+- [x] mobile renderer golden 验证通过。
+- [x] mobile release readiness 通过。
+- [x] 记录 TestFlight/App Store 上传阻塞项。
+
+## 执行记录
+
+- [x] `mobile/ios/project.yml` 版本从 `1.0.6` build `7` 更新为 `1.0.7` build `8`。
+- [x] 通过 `xcodegen generate` 重新生成本地 Xcode project。
+- [x] 构建并安装到 iPhone 17 Pro Simulator，启动 bundle id `app.mdpreview.mobile`。
+- [x] 截图保存到 `target/ios-qa/ios-simulator-launch.png`。
+- [x] 生成无签名 Release archive：`mobile/ios/build/MDPreviewMobile.xcarchive`。
+
+## 验证记录
+
+```text
+命令：xcrun devicectl list devices && xcrun xctrace list devices
+结果：未通过真机可用性。电脑能看到多台 iPhone，但 Xcode/CoreDevice 标记为 `unavailable` / `Devices Offline`。
+
+命令：security find-identity -v -p codesigning
+结果：未找到 iOS Apple Development / Apple Distribution 证书；当前只有 macOS Developer ID Application。
+
+命令：asc auth status
+结果：未登录 App Store Connect；System Keychain 中 credentials 为空，且未设置完整 ASC 环境变量。
+
+命令：cd mobile/ios && xcodegen generate && xcodebuild -project MDPreviewMobile.xcodeproj -scheme MDPreviewMobile -destination 'platform=iOS Simulator,name=iPhone 17 Pro,OS=26.5' CODE_SIGNING_ALLOWED=NO build
+结果：通过。
+
+命令：xcrun simctl install 2D8BDB83-D40C-4E0A-85FF-219A7427ECA4 <MDPreviewMobile.app> && xcrun simctl launch 2D8BDB83-D40C-4E0A-85FF-219A7427ECA4 app.mdpreview.mobile
+结果：通过。模拟器安装成功，启动进程 pid 97643。
+
+命令：xcrun simctl io 2D8BDB83-D40C-4E0A-85FF-219A7427ECA4 screenshot target/ios-qa/ios-simulator-launch.png
+结果：通过。截图显示 MD Preview 空状态首屏。
+
+命令：NODE_PATH=/Users/longjiewu/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/node_modules /Users/longjiewu/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node mobile/scripts/verify-mobile-renderer.mjs
+结果：通过。
+
+命令：mobile/scripts/verify-release-readiness.sh
+结果：通过。
+
+命令：cd mobile/ios && xcodebuild clean archive -project MDPreviewMobile.xcodeproj -scheme MDPreviewMobile -configuration Release -destination 'generic/platform=iOS' -archivePath "$PWD/build/MDPreviewMobile.xcarchive" CODE_SIGNING_ALLOWED=NO
+结果：通过。无签名 archive 生成成功；archive Info.plist 确认为 version `1.0.7` build `8`。
+
+命令：./scripts/verify.sh
+结果：通过。覆盖 release signing contract、cargo test、anchor navigation、Sparkle update、Windows self-update、iOS xcodegen/build/parse、Android debug/release、mobile renderer、release readiness。
+```
+
+## 风险和假设
+
+- 真机目前仍是 Xcode Offline/unavailable，无法安装到真实 iPhone 验收 Open In / 分享面板流程。
+- 未配置 iOS signing team、Apple Development/Distribution 证书和 provisioning profile，无法导出可上传 TestFlight 的 IPA。
+- `asc` CLI 已安装，但未登录 App Store Connect，无法解析 app id、TestFlight group、上传 build 或检查 submission health。
+
+---
+
+# 上一任务存档：发布签名链路修复
 
 ## 目标
 
