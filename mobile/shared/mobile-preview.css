@@ -271,6 +271,69 @@ body.empty #preview {
   color: var(--muted);
 }
 
+#preview .markdown-alert-note,
+#preview .markdown-alert-tip,
+#preview .markdown-alert-important,
+#preview .markdown-alert-warning,
+#preview .markdown-alert-caution {
+  margin: 1em 0;
+  padding: 0.75em 1em;
+  border-radius: 6px;
+  color: var(--fg);
+}
+
+#preview .markdown-alert-note {
+  border-color: #0969da;
+  background: #ddf4ff;
+}
+
+#preview .markdown-alert-tip {
+  border-color: #1a7f37;
+  background: #dafbe1;
+}
+
+#preview .markdown-alert-important {
+  border-color: #8250df;
+  background: #fbefff;
+}
+
+#preview .markdown-alert-warning {
+  border-color: #9a6700;
+  background: #fff8c5;
+}
+
+#preview .markdown-alert-caution {
+  border-color: #cf222e;
+  background: #ffebe9;
+}
+
+@media (prefers-color-scheme: dark) {
+  #preview .markdown-alert-note {
+    border-color: #2f81f7;
+    background: rgba(47, 129, 247, 0.1);
+  }
+
+  #preview .markdown-alert-tip {
+    border-color: #3fb950;
+    background: rgba(63, 185, 80, 0.1);
+  }
+
+  #preview .markdown-alert-important {
+    border-color: #a371f7;
+    background: rgba(163, 113, 247, 0.12);
+  }
+
+  #preview .markdown-alert-warning {
+    border-color: #d29922;
+    background: rgba(210, 153, 34, 0.12);
+  }
+
+  #preview .markdown-alert-caution {
+    border-color: #f85149;
+    background: rgba(248, 81, 73, 0.12);
+  }
+}
+
 #preview table {
   display: block;
   width: max-content;
@@ -351,6 +414,13 @@ body.empty #preview {
 #preview .mdp-mermaid-error,
 #preview .mdp-math-error {
   color: #b42318;
+}
+
+#preview mark.mdp-mark {
+  border-radius: 3px;
+  padding: 0 0.12em;
+  background: #fff2a8;
+  color: inherit;
 }
 
 #preview mark.search-hit {

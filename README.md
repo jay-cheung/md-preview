@@ -92,6 +92,8 @@ On Android, MD Preview appears in the system "Open with" and share flows for Mar
 | Syntax highlighting | highlight.js is embedded offline and injected after first paint. |
 | Math | KaTeX renders `$...$`, `$$...$$`, `\(...\)`, and `\[...\]` on demand. |
 | Diagrams | Mermaid fenced blocks render locally when the document actually uses them. |
+| GitHub Alerts | `[!NOTE]`, `[!TIP]`, `[!IMPORTANT]`, `[!WARNING]`, and `[!CAUTION]` blockquotes render as alert callouts. |
+| Highlights | `==highlight==` renders as marked text for notes and AI-generated docs. |
 | Dark mode | Follows the system color scheme across macOS, Windows, and Linux. |
 | GitHub-flavored Markdown | Tables, task lists, strikethrough, heading attributes, and anchors. |
 | External links | `http`, `https`, and `mailto` links open in the system browser or mail app. |
@@ -114,6 +116,8 @@ On Android, MD Preview appears in the system "Open with" and share flows for Mar
 MD Preview uses `pulldown-cmark` for the base Markdown pass, then enhances the rendered document only when needed:
 
 - CommonMark plus GFM-style tables, task lists, strikethrough, and heading attributes
+- GitHub-style alert blockquotes for notes, tips, warnings, and cautions
+- `==highlight==` text marks used by many Markdown note tools
 - Offline code highlighting for 40+ languages, including Delphi/Pascal
 - Offline KaTeX math rendering with safeguards so Markdown emphasis does not break formulas
 - Offline Mermaid rendering for fenced ```` ```mermaid ```` blocks
@@ -147,6 +151,20 @@ Install WebKitGTK 4.1 packages for your distribution. On Debian/Ubuntu:
 
 ```bash
 sudo apt-get install libwebkit2gtk-4.1-dev libgtk-3-dev libayatana-appindicator3-dev
+```
+
+**Linux opens a blank window on NVIDIA**
+
+MD Preview automatically applies a conservative WebKitGTK fallback on Linux systems with the NVIDIA driver loaded. If your distribution still shows a blank WebView, start it manually with:
+
+```bash
+WEBKIT_DISABLE_DMABUF_RENDERER=1 md-preview your-file.md
+```
+
+If that does not help, try:
+
+```bash
+WEBKIT_DISABLE_COMPOSITING_MODE=1 md-preview your-file.md
 ```
 
 **Windows cannot set MD Preview as the default app automatically**

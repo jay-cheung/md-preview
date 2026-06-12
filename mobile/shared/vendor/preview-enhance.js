@@ -27,6 +27,7 @@
         tag === 'SCRIPT' || tag === 'STYLE' || tag === 'TEXTAREA') return true;
     return hasClassInTree(el, 'katex') ||
       hasClassInTree(el, 'math') ||
+      hasClassInTree(el, 'mdp-mark') ||
       hasClassInTree(el, 'mdp-mermaid') ||
       hasClassInTree(el, 'mdp-mermaid-error');
   }
@@ -216,6 +217,98 @@
     });
   }
 
+  function alertClassFor(value) {
+    var type = String(value || '').toLowerCase();
+    if (type === 'note' || type === 'tip' || type === 'important' ||
+        type === 'warning' || type === 'caution') {
+      return 'markdown-alert-' + type;
+    }
+    return '';
+  }
+
+  function trimAlertLead(node) {
+    while (node && node.firstChild) {
+      var child = node.firstChild;
+      if (child.nodeType === Node.TEXT_NODE && !child.nodeValue.trim()) {
+        node.removeChild(child);
+        continue;
+      }
+      if (child.nodeName === 'BR') {
+        node.removeChild(child);
+        continue;
+      }
+      break;
+    }
+  }
+
+  function enhanceAlerts(root) {
+    var quotes = root.querySelectorAll('blockquote');
+    Array.prototype.forEach.call(quotes, function(quote) {
+      if (quote.className && /\bmarkdown-alert-/.test(quote.className)) return;
+      var first = quote.firstElementChild || quote;
+      if (!first || !first.firstChild || first.firstChild.nodeType !== Node.TEXT_NODE) return;
+
+      var match = first.firstChild.nodeValue.match(/^\s*\[!(NOTE|TIP|IMPORTANT|WARNING|CAUTION)\]\s*/i);
+      if (!match) return;
+
+      var cls = alertClassFor(match[1]);
+      if (!cls) return;
+
+      quote.classList.add(cls);
+      first.firstChild.nodeValue = first.firstChild.nodeValue.slice(match[0].length);
+      trimAlertLead(first);
+      if (first !== quote) trimAlertLead(quote);
+    });
+  }
+
+  function markParts(text) {
+    var parts = [];
+    var cursor = 0;
+    while (cursor < text.length) {
+      var open = text.indexOf('==', cursor);
+      if (open < 0) break;
+      var close = text.indexOf('==', open + 2);
+      if (close < 0) break;
+      var body = text.slice(open + 2, close);
+      if (!body.trim()) break;
+      if (open > cursor) parts.push({ text: text.slice(cursor, open) });
+      parts.push({ mark: body });
+      cursor = close + 2;
+    }
+    if (!parts.length) return null;
+    if (cursor < text.length) parts.push({ text: text.slice(cursor) });
+    return parts;
+  }
+
+  function enhanceMarks(root) {
+    var walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, {
+      acceptNode: function(node) {
+        if (shouldSkipTextNode(node)) return NodeFilter.FILTER_REJECT;
+        return node.nodeValue.indexOf('==') >= 0 ?
+          NodeFilter.FILTER_ACCEPT :
+          NodeFilter.FILTER_REJECT;
+      }
+    });
+    var nodes = [];
+    while (walker.nextNode()) nodes.push(walker.currentNode);
+    nodes.forEach(function(node) {
+      var parts = markParts(node.nodeValue);
+      if (!parts) return;
+      var frag = document.createDocumentFragment();
+      parts.forEach(function(part) {
+        if (part.text !== undefined) {
+          frag.appendChild(document.createTextNode(part.text));
+          return;
+        }
+        var mark = document.createElement('mark');
+        mark.className = 'mdp-mark';
+        mark.textContent = part.mark;
+        frag.appendChild(mark);
+      });
+      node.parentNode.replaceChild(frag, node);
+    });
+  }
+
   window.__setFeatureFlags = setFlags;
 
   window.__setKatexCss = function(css) {
@@ -231,6 +324,8 @@
     if (!root) return;
     idle(function() {
       enhanceTables(root);
+      enhanceAlerts(root);
+      enhanceMarks(root);
       enhanceMath(root);
       enhanceMermaid(root);
     });

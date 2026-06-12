@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.1.19
+
+- Added GitHub-style alert rendering for `[!NOTE]`, `[!TIP]`, `[!IMPORTANT]`, `[!WARNING]`, and `[!CAUTION]` blockquotes on desktop and mobile.
+- Added lightweight `==highlight==` mark rendering while leaving code spans and code blocks unchanged.
+- Added a Linux WebKitGTK/NVIDIA compatibility fallback that disables the DMABUF renderer when no WebKit workaround is already configured, plus documented the manual fallback commands.
+- Added mobile renderer coverage for GitHub Alerts and highlight marks.
+
 ## 1.1.16
 
 - Fixed in-document anchor clicks when a Markdown file has a local `<base href>` for relative assets. Table-of-contents links such as `[需求概述](#需求概述)` now scroll inside the preview instead of being treated as file navigation.

@@ -33,6 +33,11 @@ await page.evaluate(() => {
       '',
       '$$E=mc^2$$',
       '',
+      '> [!IMPORTANT]',
+      '> This alert should render as a GitHub alert.',
+      '',
+      'This has ==highlighted text== but `==literal code==` stays literal.',
+      '',
       '```mermaid',
       'graph TD',
       '  A[Open] --> B[Preview]',
@@ -45,6 +50,8 @@ await page.evaluate(() => {
 
 await page.waitForSelector('.katex', { timeout: 5000 });
 await page.waitForSelector('.mdp-mermaid svg', { timeout: 5000 });
+await page.waitForSelector('.markdown-alert-important', { timeout: 1000 });
+await page.waitForSelector('mark.mdp-mark', { timeout: 1000 });
 const beforeSearchTop = await page.locator('#app').boundingBox();
 await page.locator('#search-toggle').click();
 const searchingTop = await page.locator('#app').boundingBox();
@@ -60,6 +67,9 @@ const result = await page.evaluate((searchHits) => ({
   title: document.getElementById('title').textContent,
   katex: document.querySelectorAll('.katex').length,
   mermaidSvg: document.querySelectorAll('.mdp-mermaid svg').length,
+  alertText: document.querySelector('.markdown-alert-important')?.textContent.trim(),
+  highlightText: document.querySelector('mark.mdp-mark')?.textContent,
+  codeLiteral: document.querySelector('code')?.textContent,
   topActionIcons: document.querySelectorAll('#top-actions .tool-button svg').length,
   searchHits,
   printTopbarDisplay: getComputedStyle(document.getElementById('topbar')).display,
@@ -78,6 +88,11 @@ if (result.title !== 'mobile-fixture.md') {
 }
 if (!result.katex || !result.mermaidSvg || !result.searchHits) {
   throw new Error(`Renderer feature check failed: ${JSON.stringify(result)}`);
+}
+if (result.alertText !== 'This alert should render as a GitHub alert.' ||
+    result.highlightText !== 'highlighted text' ||
+    result.codeLiteral !== '==literal code==') {
+  throw new Error(`Markdown extension check failed: ${JSON.stringify(result)}`);
 }
 if (result.topActionIcons !== 3) {
   throw new Error(`Toolbar icons missing: ${JSON.stringify(result)}`);

@@ -2,75 +2,55 @@
 
 ## 目标
 
-- 修复搜索框输入中文时过早触发搜索并丢失焦点的问题。
-- 覆盖用户场景：搜索“执业药师”时，输入第一个字“执”后仍能继续输入，不需要再次点击搜索框。
-- 发布 `v1.1.18`，确认 GitHub Release、签名公证、Gatekeeper、appcast 和线上资产正常。
+- 解决 GitHub issues #3、#20、#23，并完成 #19 的 Homebrew Cask 发布路径。
+- 发布新的桌面版本 `v1.1.19`，推送到 GitHub，并验证 Release assets。
+- 在验证通过后同步 issue 状态，避免已完成事项继续悬挂。
 
 ## 非目标
 
-- 不改变 Markdown 渲染、锚点跳转、文件打开或更新下载策略。
-- 不改 Windows 自更新逻辑。
-- 不调整搜索 UI 视觉样式。
+- 不重做 Markdown 引擎，不引入新的大型渲染依赖。
+- 不调整主题选择器、CLI `--edit` / `--print` 等其他 open issues。
+- 不改变移动端 App Store / Google Play 分发策略。
 
 ## 验收场景
 
-- [x] 中文输入过程中继续尊重 `compositionstart` / `compositionend` / `e.isComposing`。
-- [x] 搜索 debounce 增加到 `300ms`，避免首个中文字符刚提交就立刻打断继续输入。
-- [x] `window.find()` 触发正文选区后，搜索框会恢复焦点和光标位置。
-- [x] 实测输入“执”后等待搜索，再继续输入“业药师”，搜索框最终保持“执业药师”且光标仍在输入框中。
-- [x] `v1.1.18` GitHub Release 完成，Release asset 包含 macOS DMG、Windows EXE、Linux tarball、`appcast.xml`。
-- [x] macOS DMG 和内层 app 已签名、公证、staple，并通过 Gatekeeper 校验。
+- [x] `> [!IMPORTANT]` 渲染为 `markdown-alert-important`，并且 `[!IMPORTANT]` 标记本身不显示在正文里。
+- [x] `==高亮 & tag==` 渲染为 `<mark class="mdp-mark">`，内部文本仍然安全转义。
+- [x] inline code / fenced code 中的 `==literal==` 不会被误转成高亮。
+- [x] Linux + NVIDIA 且用户没有手动设置 WebKit workaround 时，启动前自动设置 `WEBKIT_DISABLE_DMABUF_RENDERER=1`。
+- [x] 用户已显式设置 `WEBKIT_DISABLE_DMABUF_RENDERER` 或 `WEBKIT_DISABLE_COMPOSITING_MODE` 时，程序不覆盖用户选择。
+- [x] 移动端共享预览层同样支持 GitHub Alerts 和 `==highlight==`。
+- [x] README / README_zh 记录新 Markdown 支持和 Linux NVIDIA 空白窗口 workaround。
+- [ ] 新版 `v1.1.19` GitHub Release 包含 macOS DMG、Windows EXE、Linux tarball、`appcast.xml`。
+- [ ] Homebrew Cask 使用新版 macOS DMG 的真实 sha256，并通过 `brew audit --cask` 或记录明确 blocker。
 
 ## 执行记录
 
-- [x] 将搜索 debounce 从 `80ms` 调整为 `300ms`。
-- [x] 在 `runFind()` 前记录搜索框 selection range。
-- [x] 搜索后通过 timeout + animation frame 恢复搜索框焦点和光标位置。
-- [x] 添加字符串级单测断言，覆盖 debounce 和焦点恢复逻辑进入页面脚本。
-- [x] 版本号更新到 `1.1.18`。
-- [x] 发布 `v1.1.18` 并更新 Release notes。
+- [x] 桌面 Markdown 解析启用 `Options::ENABLE_GFM`，使用 `pulldown-cmark` 原生 GitHub Alert 支持。
+- [x] 桌面 Markdown event 层增加 `==highlight==` 到 `<mark class="mdp-mark">` 的转换。
+- [x] 桌面和移动端补充 GitHub Alert / mark CSS。
+- [x] Linux 启动阶段增加 NVIDIA/WebKitGTK DMABUF fallback。
+- [x] 移动端共享增强脚本增加 GitHub Alert 和 mark DOM 增强。
+- [x] 移动端 Playwright renderer fixture 覆盖 alert、mark、code literal。
+- [x] 版本号更新到 `1.1.19`，CHANGELOG / README / README_zh 更新。
 
 ## 验证记录
 
 ```text
-命令：cargo test page_blocks_native_preview_reload_paths -- --nocapture
-结果：通过。
-
 命令：cargo test -- --nocapture
-结果：通过。14 个 Rust 单测全部通过。
+结果：通过。17 个 Rust 单测全部通过，覆盖 GitHub Alerts、mark 渲染、code 不误伤、Linux NVIDIA fallback、既有锚点/搜索/更新逻辑。
+
+命令：NODE_PATH=/Users/longjiewu/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/node_modules /Users/longjiewu/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node mobile/scripts/verify-mobile-renderer.mjs
+结果：通过。移动端 fixture 渲染 KaTeX、Mermaid、GitHub Alert、mark、搜索、打印样式和 javascript: 链接拦截。
 
 命令：./scripts/verify.sh
-结果：通过。guard、cargo test、anchor navigation、Sparkle update、Windows self-update、iOS build/parse、Android debug/release、mobile renderer/release readiness 均通过。
+结果：通过。guard、cargo test、anchor navigation、Sparkle update、Windows self-update、iOS xcodegen/build/parse、Android debug/release、mobile renderer、release readiness 全部通过。
 
-命令：本地启动 debug app，打开包含“执业药师”的临时 Markdown，先输入“执”，等待搜索触发后继续输入“业药师”。
-结果：通过。搜索框最终为“执业药师”，焦点和光标仍在搜索框中；截图：/tmp/md-preview-search-focus-test-2.png。
-
-命令：scripts/release.sh v1.1.18
-结果：本地验证、commit/tag 推送、GitHub Actions 和 Release 创建通过；第一次 Apple notary 在外层 DMG 阶段因 NSURLErrorDomain Code=-1001 超时中断。
-
-命令：./release-sign.sh v1.1.18
-结果：远程签名机重试仍遇到 Apple notary 超时。
-
-命令：~/.claude/skills/remote-mac-sign/sign.sh /tmp/.../MD-Preview-macOS-universal.dmg
-结果：本机 Developer ID + hulihuli-notary profile 可用；本机签名、公证、staple 成功；签名后 DMG 已覆盖上传到 GitHub Release；appcast.xml 已生成并上传。
-
-命令：gh release view v1.1.18 -R vorojar/md-preview --json url,assets
-结果：通过。Release asset 包含 appcast.xml、MD-Preview-linux-x64.tar.gz、MD-Preview-macOS-universal.dmg、MD-Preview-windows-x64.exe。
-
-命令：xcrun stapler validate target/MD-Preview-macOS-universal.dmg
-结果：通过。The validate action worked。
-
-命令：codesign --verify --deep --strict --verbose=2 target/MD\ Preview.app
-结果：通过。app valid on disk，satisfies Designated Requirement。
-
-命令：spctl -a -t open --context context:primary-signature target/MD-Preview-macOS-universal.dmg
-结果：通过。
-
-命令：curl -fsSL https://github.com/vorojar/md-preview/releases/latest/download/appcast.xml
-结果：通过。线上 appcast 指向 MD Preview 1.1.18、v1.1.18 macOS DMG，并包含 sparkle:edSignature。
+命令：cargo build --release
+结果：通过。确认非 Linux release build 不再出现 `linux_webkit_compat_env` dead_code warning。
 ```
 
 ## 风险和假设
 
-- 这次修复保留实时搜索，只延后到用户输入短暂停顿后执行；如果用户极快连续输入，搜索会等最后一次输入后触发。
-- GitHub Actions 当前仍有 Node.js 20 deprecation annotation 和 windows-latest 重定向 notice，不影响本次 release，但需要后续升级 workflow。
+- 本机不是 Linux/NVIDIA 环境，#3 的自动 fallback 通过确定性单元测试和文档验证；真实 GPU/WebKitGTK 渲染仍需用户环境回归。
+- Homebrew/homebrew-cask PR 需要新 release asset 的最终 sha256，因此必须在 `v1.1.19` 发布完成后处理。

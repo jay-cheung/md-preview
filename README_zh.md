@@ -92,6 +92,8 @@ Android 上，MD Preview 会出现在 Markdown 文件的“打开方式”和分
 | 代码高亮 | highlight.js 离线内置，首屏之后再注入，不阻塞打开。 |
 | 数学公式 | KaTeX 按需渲染 `$...$`、`$$...$$`、`\(...\)`、`\[...\]`。 |
 | 图表 | Mermaid fenced code block 只在文档实际使用时本地渲染。 |
+| GitHub Alerts | `[!NOTE]`、`[!TIP]`、`[!IMPORTANT]`、`[!WARNING]`、`[!CAUTION]` blockquote 会渲染成提示块。 |
+| 高亮标记 | `==高亮==` 会渲染成 marked text，适合笔记和 AI 生成文档。 |
 | 暗色模式 | 自动跟随 macOS、Windows、Linux 的系统主题。 |
 | GFM 支持 | 表格、任务列表、删除线、heading attributes、标题锚点。 |
 | 外链跳转 | `http`、`https`、`mailto` 链接交给系统浏览器或邮件客户端。 |
@@ -114,6 +116,8 @@ Android 上，MD Preview 会出现在 Markdown 文件的“打开方式”和分
 MD Preview 先用 `pulldown-cmark` 完成基础 Markdown 解析，再只在需要时增强渲染结果：
 
 - CommonMark 加 GFM 风格表格、任务列表、删除线、heading attributes
+- GitHub 风格 Alerts blockquote，支持 note、tip、important、warning、caution
+- 很多笔记工具常用的 `==高亮==` 文本标记
 - 40+ 语言离线代码高亮，包含 Delphi / Pascal
 - KaTeX 离线数学公式渲染，并保护公式不被 Markdown 强调语法破坏
 - Mermaid 离线渲染 ```` ```mermaid ```` fenced code block
@@ -147,6 +151,20 @@ MD Preview 没有账号、没有 telemetry、没有 analytics。你的 Markdown 
 
 ```bash
 sudo apt-get install libwebkit2gtk-4.1-dev libgtk-3-dev libayatana-appindicator3-dev
+```
+
+**Linux NVIDIA 环境打开后窗口空白**
+
+MD Preview 会在检测到 Linux 系统已加载 NVIDIA 驱动时自动启用更保守的 WebKitGTK fallback。如果你的发行版仍然出现 WebView 空白，可以手动这样启动：
+
+```bash
+WEBKIT_DISABLE_DMABUF_RENDERER=1 md-preview your-file.md
+```
+
+如果仍然异常，再尝试：
+
+```bash
+WEBKIT_DISABLE_COMPOSITING_MODE=1 md-preview your-file.md
 ```
 
 **Windows 不能自动设为默认 Markdown 应用**

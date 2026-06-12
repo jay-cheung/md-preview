@@ -235,12 +235,62 @@ fn md_to_html(md: &str) -> String {
         | Options::ENABLE_STRIKETHROUGH
         | Options::ENABLE_TASKLISTS
         | Options::ENABLE_HEADING_ATTRIBUTES
-        | Options::ENABLE_MATH;
+        | Options::ENABLE_MATH
+        | Options::ENABLE_GFM;
     let parser = Parser::new_ext(md, opts);
-    let events = add_heading_ids(parser.collect());
+    let events = add_mark_highlights(add_heading_ids(parser.collect()));
     let mut html_out = String::new();
     html::push_html(&mut html_out, events.into_iter());
     html_out
+}
+
+fn add_mark_highlights<'a>(events: Vec<MdEvent<'a>>) -> Vec<MdEvent<'a>> {
+    let mut out = Vec::with_capacity(events.len());
+
+    for event in events {
+        match event {
+            MdEvent::Text(text) => {
+                if text.contains("==") {
+                    push_mark_highlight_events(text.as_ref(), &mut out);
+                } else {
+                    out.push(MdEvent::Text(text));
+                }
+            }
+            _ => out.push(event),
+        }
+    }
+
+    out
+}
+
+fn push_mark_highlight_events<'a>(text: &str, out: &mut Vec<MdEvent<'a>>) {
+    let mut rest = text;
+
+    while let Some(open) = rest.find("==") {
+        let after_open = open + 2;
+        let Some(close_rel) = rest[after_open..].find("==") else {
+            break;
+        };
+        let close = after_open + close_rel;
+        let body = &rest[after_open..close];
+        if body.trim().is_empty() {
+            break;
+        }
+
+        if open > 0 {
+            out.push(MdEvent::Text(CowStr::Boxed(
+                rest[..open].to_string().into_boxed_str(),
+            )));
+        }
+        out.push(MdEvent::Html(CowStr::Borrowed(r#"<mark class="mdp-mark">"#)));
+        out.push(MdEvent::Text(CowStr::Boxed(body.to_string().into_boxed_str())));
+        out.push(MdEvent::Html(CowStr::Borrowed("</mark>")));
+        rest = &rest[close + 2..];
+    }
+
+    if !rest.is_empty() {
+        out.push(MdEvent::Text(CowStr::Boxed(rest.to_string().into_boxed_str())));
+    }
 }
 
 fn add_heading_ids<'a>(mut events: Vec<MdEvent<'a>>) -> Vec<MdEvent<'a>> {
@@ -656,6 +706,11 @@ body {{
   #preview pre {{ background: #2d2d2d !important; }}
   #preview code:not(pre code) {{ background: #2d2d2d; }}
   #preview blockquote {{ border-color: #444; color: #999; }}
+  #preview .markdown-alert-note {{ border-color: #2f81f7; background: rgba(47,129,247,0.10); }}
+  #preview .markdown-alert-tip {{ border-color: #3fb950; background: rgba(63,185,80,0.10); }}
+  #preview .markdown-alert-important {{ border-color: #a371f7; background: rgba(163,113,247,0.12); }}
+  #preview .markdown-alert-warning {{ border-color: #d29922; background: rgba(210,153,34,0.12); }}
+  #preview .markdown-alert-caution {{ border-color: #f85149; background: rgba(248,81,73,0.12); }}
   #preview table th {{ background: #2d2d2d; color: #f0f0f0; }}
   #preview table td, #preview table th {{ border-color: #444; }}
   #preview hr {{ border-color: #333; }}
@@ -667,6 +722,22 @@ body {{
 #preview pre {{ background: #f6f8fa; padding: 16px; border-radius: 8px; overflow-x: auto; }}
 #preview pre code {{ background: none; padding: 0; font-size: 14px; }}
 #preview blockquote {{ border-left: 4px solid #ddd; margin: 0; padding: 0 1em; color: #666; }}
+#preview .markdown-alert-note,
+#preview .markdown-alert-tip,
+#preview .markdown-alert-important,
+#preview .markdown-alert-warning,
+#preview .markdown-alert-caution {{
+  margin: 1em 0;
+  padding: 0.75em 1em;
+  border-radius: 6px;
+  color: inherit;
+}}
+#preview .markdown-alert-note {{ border-color: #0969da; background: #ddf4ff; }}
+#preview .markdown-alert-tip {{ border-color: #1a7f37; background: #dafbe1; }}
+#preview .markdown-alert-important {{ border-color: #8250df; background: #fbefff; }}
+#preview .markdown-alert-warning {{ border-color: #9a6700; background: #fff8c5; }}
+#preview .markdown-alert-caution {{ border-color: #cf222e; background: #ffebe9; }}
+#preview .mdp-mark {{ border-radius: 3px; padding: 0 0.12em; background: #fff2a8; color: inherit; }}
 #preview table {{ border-collapse: collapse; width: 100%; }}
 #preview .mdp-table-wrap {{
   width: min(calc(100vw - 64px), 1280px);
@@ -1234,6 +1305,34 @@ mod tests {
     }
 
     #[test]
+    fn github_alerts_render_as_markdown_alert_blockquotes() {
+        let html = md_to_html("> [!IMPORTANT]\n> This is an alert");
+
+        assert!(html.contains(r#"<blockquote class="markdown-alert-important">"#));
+        assert!(html.contains("<p>This is an alert</p>"));
+        assert!(!html.contains("[!IMPORTANT]"));
+    }
+
+    #[test]
+    fn double_equals_highlight_renders_mark_without_touching_code() {
+        let html = md_to_html("Use ==highlight & tag== here and `==literal==` there.");
+
+        assert!(html.contains(r#"Use <mark class="mdp-mark">highlight &amp; tag</mark> here"#));
+        assert!(html.contains("<code>==literal==</code>"));
+    }
+
+    #[test]
+    fn linux_nvidia_compat_env_only_sets_dmabuf_when_unconfigured() {
+        assert_eq!(
+            linux_webkit_compat_env(None, None, true),
+            Some(("WEBKIT_DISABLE_DMABUF_RENDERER", "1"))
+        );
+        assert_eq!(linux_webkit_compat_env(Some("0"), None, true), None);
+        assert_eq!(linux_webkit_compat_env(None, Some("1"), true), None);
+        assert_eq!(linux_webkit_compat_env(None, None, false), None);
+    }
+
+    #[test]
     fn generated_heading_ids_support_cjk_anchor_links() {
         let html = md_to_html("1. [需求概述](#需求概述)\n\n## 需求概述");
 
@@ -1291,6 +1390,8 @@ mod tests {
         assert!(page.contains("body.empty .toolbar.has-update"));
         assert!(page.contains("bindAnchorNavigation"));
         assert!(page.contains("event.target.closest('#preview a[href]')"));
+        assert!(page.contains(".markdown-alert-important"));
+        assert!(page.contains(".mdp-mark"));
     }
 
     #[test]
@@ -1937,7 +2038,37 @@ fn check_native_updates(
     false
 }
 
+#[cfg(any(target_os = "linux", test))]
+fn linux_webkit_compat_env(
+    disable_dmabuf: Option<&str>,
+    disable_compositing: Option<&str>,
+    nvidia_driver_present: bool,
+) -> Option<(&'static str, &'static str)> {
+    if disable_dmabuf.is_some() || disable_compositing.is_some() || !nvidia_driver_present {
+        return None;
+    }
+
+    Some(("WEBKIT_DISABLE_DMABUF_RENDERER", "1"))
+}
+
+#[cfg(target_os = "linux")]
+fn apply_linux_webkit_compat_env() {
+    let nvidia_driver_present = Path::new("/proc/driver/nvidia/version").exists();
+    if let Some((key, value)) = linux_webkit_compat_env(
+        std::env::var("WEBKIT_DISABLE_DMABUF_RENDERER").ok().as_deref(),
+        std::env::var("WEBKIT_DISABLE_COMPOSITING_MODE").ok().as_deref(),
+        nvidia_driver_present,
+    ) {
+        std::env::set_var(key, value);
+    }
+}
+
+#[cfg(not(target_os = "linux"))]
+fn apply_linux_webkit_compat_env() {}
+
 fn main() {
+    apply_linux_webkit_compat_env();
+
     // Bench instrumentation: MD_PREVIEW_BENCH=1 makes the app print
     // cold-start timings to stderr and exit as soon as the first paint
     // lands. Costs nothing outside bench mode.
