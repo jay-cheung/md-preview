@@ -227,6 +227,33 @@
     return '';
   }
 
+  function alertTypeFromClass(node) {
+    var match = String(node && node.className || '').match(/\bmarkdown-alert-(note|tip|important|warning|caution)\b/i);
+    return match ? match[1].toLowerCase() : '';
+  }
+
+  function alertLabelFor(type) {
+    var labels = {
+      note: 'Note',
+      tip: 'Tip',
+      important: 'Important',
+      warning: 'Warning',
+      caution: 'Caution'
+    };
+    return labels[type] || '';
+  }
+
+  function ensureAlertTitle(quote, type) {
+    if (!quote || !type) return;
+    var existing = quote.firstElementChild;
+    if (existing && existing.classList && existing.classList.contains('markdown-alert-title')) return;
+
+    var title = document.createElement('p');
+    title.className = 'markdown-alert-title';
+    title.textContent = alertLabelFor(type);
+    quote.insertBefore(title, quote.firstChild);
+  }
+
   function trimAlertLead(node) {
     while (node && node.firstChild) {
       var child = node.firstChild;
@@ -245,20 +272,30 @@
   function enhanceAlerts(root) {
     var quotes = root.querySelectorAll('blockquote');
     Array.prototype.forEach.call(quotes, function(quote) {
-      if (quote.className && /\bmarkdown-alert-/.test(quote.className)) return;
+      var type = alertTypeFromClass(quote);
       var first = quote.firstElementChild || quote;
-      if (!first || !first.firstChild || first.firstChild.nodeType !== Node.TEXT_NODE) return;
+      var match = null;
 
-      var match = first.firstChild.nodeValue.match(/^\s*\[!(NOTE|TIP|IMPORTANT|WARNING|CAUTION)\]\s*/i);
-      if (!match) return;
+      if (!type && first && first.firstChild && first.firstChild.nodeType === Node.TEXT_NODE) {
+        match = first.firstChild.nodeValue.match(/^\s*\[!(NOTE|TIP|IMPORTANT|WARNING|CAUTION)\]\s*/i);
+        if (match) type = String(match[1]).toLowerCase();
+      }
 
-      var cls = alertClassFor(match[1]);
+      if (!type) return;
+
+      var cls = alertClassFor(type);
       if (!cls) return;
 
       quote.classList.add(cls);
-      first.firstChild.nodeValue = first.firstChild.nodeValue.slice(match[0].length);
-      trimAlertLead(first);
-      if (first !== quote) trimAlertLead(quote);
+      if (match) {
+        first.firstChild.nodeValue = first.firstChild.nodeValue.slice(match[0].length);
+        trimAlertLead(first);
+        if (first !== quote && !first.children.length && !first.textContent.trim()) {
+          quote.removeChild(first);
+        }
+        trimAlertLead(quote);
+      }
+      ensureAlertTitle(quote, type);
     });
   }
 

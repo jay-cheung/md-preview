@@ -61,13 +61,20 @@ const searchHitCount = await page.locator('mark.search-hit').count();
 await page.locator('#search-close').click();
 const afterSearchTop = await page.locator('#app').boundingBox();
 await page.locator('a[href^="javascript:"]').click();
-await page.emulateMedia({ media: 'print' });
+await page.emulateMedia({ colorScheme: 'dark' });
+const darkAlert = await page.evaluate(() => ({
+  background: getComputedStyle(document.querySelector('.markdown-alert-important')).backgroundColor,
+  titleColor: getComputedStyle(document.querySelector('.markdown-alert-important .markdown-alert-title')).color
+}));
+await page.emulateMedia({ media: 'print', colorScheme: 'dark' });
 
 const result = await page.evaluate((searchHits) => ({
   title: document.getElementById('title').textContent,
   katex: document.querySelectorAll('.katex').length,
   mermaidSvg: document.querySelectorAll('.mdp-mermaid svg').length,
-  alertText: document.querySelector('.markdown-alert-important')?.textContent.trim(),
+  alertTitle: document.querySelector('.markdown-alert-important .markdown-alert-title')?.textContent.trim(),
+  alertText: document.querySelector('.markdown-alert-important p:not(.markdown-alert-title)')?.textContent.trim(),
+  alertBg: getComputedStyle(document.querySelector('.markdown-alert-important')).backgroundColor,
   highlightText: document.querySelector('mark.mdp-mark')?.textContent,
   codeLiteral: document.querySelector('code')?.textContent,
   topActionIcons: document.querySelectorAll('#top-actions .tool-button svg').length,
@@ -89,10 +96,16 @@ if (result.title !== 'mobile-fixture.md') {
 if (!result.katex || !result.mermaidSvg || !result.searchHits) {
   throw new Error(`Renderer feature check failed: ${JSON.stringify(result)}`);
 }
-if (result.alertText !== 'This alert should render as a GitHub alert.' ||
+if (result.alertTitle !== 'Important' ||
+    result.alertText !== 'This alert should render as a GitHub alert.' ||
+    result.alertBg === 'rgba(0, 0, 0, 0)' ||
     result.highlightText !== 'highlighted text' ||
     result.codeLiteral !== '==literal code==') {
   throw new Error(`Markdown extension check failed: ${JSON.stringify(result)}`);
+}
+if (darkAlert.background !== 'rgb(22, 27, 34)' ||
+    darkAlert.titleColor !== 'rgb(163, 113, 247)') {
+  throw new Error(`Dark alert style check failed: ${JSON.stringify(darkAlert)}`);
 }
 if (result.topActionIcons !== 3) {
   throw new Error(`Toolbar icons missing: ${JSON.stringify(result)}`);

@@ -706,11 +706,21 @@ body {{
   #preview pre {{ background: #2d2d2d !important; }}
   #preview code:not(pre code) {{ background: #2d2d2d; }}
   #preview blockquote {{ border-color: #444; color: #999; }}
-  #preview .markdown-alert-note {{ border-color: #2f81f7; background: rgba(47,129,247,0.10); }}
-  #preview .markdown-alert-tip {{ border-color: #3fb950; background: rgba(63,185,80,0.10); }}
-  #preview .markdown-alert-important {{ border-color: #a371f7; background: rgba(163,113,247,0.12); }}
-  #preview .markdown-alert-warning {{ border-color: #d29922; background: rgba(210,153,34,0.12); }}
-  #preview .markdown-alert-caution {{ border-color: #f85149; background: rgba(248,81,73,0.12); }}
+  #preview .markdown-alert-note,
+  #preview .markdown-alert-tip,
+  #preview .markdown-alert-important,
+  #preview .markdown-alert-warning,
+  #preview .markdown-alert-caution {{ background: #161b22; }}
+  #preview .markdown-alert-note {{ border-color: #2f81f7; }}
+  #preview .markdown-alert-tip {{ border-color: #3fb950; }}
+  #preview .markdown-alert-important {{ border-color: #a371f7; }}
+  #preview .markdown-alert-warning {{ border-color: #d29922; }}
+  #preview .markdown-alert-caution {{ border-color: #f85149; }}
+  #preview .markdown-alert-note .markdown-alert-title {{ color: #2f81f7; }}
+  #preview .markdown-alert-tip .markdown-alert-title {{ color: #3fb950; }}
+  #preview .markdown-alert-important .markdown-alert-title {{ color: #a371f7; }}
+  #preview .markdown-alert-warning .markdown-alert-title {{ color: #d29922; }}
+  #preview .markdown-alert-caution .markdown-alert-title {{ color: #f85149; }}
   #preview table th {{ background: #2d2d2d; color: #f0f0f0; }}
   #preview table td, #preview table th {{ border-color: #444; }}
   #preview hr {{ border-color: #333; }}
@@ -732,11 +742,25 @@ body {{
   border-radius: 6px;
   color: inherit;
 }}
+#preview .markdown-alert-title {{
+  display: flex;
+  align-items: center;
+  gap: .35em;
+  margin: 0 0 .45em;
+  font-weight: 600;
+  line-height: 1.25;
+}}
+#preview .markdown-alert-title + p {{ margin-top: 0; }}
 #preview .markdown-alert-note {{ border-color: #0969da; background: #ddf4ff; }}
 #preview .markdown-alert-tip {{ border-color: #1a7f37; background: #dafbe1; }}
 #preview .markdown-alert-important {{ border-color: #8250df; background: #fbefff; }}
 #preview .markdown-alert-warning {{ border-color: #9a6700; background: #fff8c5; }}
 #preview .markdown-alert-caution {{ border-color: #cf222e; background: #ffebe9; }}
+#preview .markdown-alert-note .markdown-alert-title {{ color: #0969da; }}
+#preview .markdown-alert-tip .markdown-alert-title {{ color: #1a7f37; }}
+#preview .markdown-alert-important .markdown-alert-title {{ color: #8250df; }}
+#preview .markdown-alert-warning .markdown-alert-title {{ color: #9a6700; }}
+#preview .markdown-alert-caution .markdown-alert-title {{ color: #cf222e; }}
 #preview .mdp-mark {{ border-radius: 3px; padding: 0 0.12em; background: #fff2a8; color: inherit; }}
 #preview table {{ border-collapse: collapse; width: 100%; }}
 #preview .mdp-table-wrap {{
@@ -1391,6 +1415,8 @@ mod tests {
         assert!(page.contains("bindAnchorNavigation"));
         assert!(page.contains("event.target.closest('#preview a[href]')"));
         assert!(page.contains(".markdown-alert-important"));
+        assert!(page.contains(".markdown-alert-title"));
+        assert!(page.contains("background: #161b22"));
         assert!(page.contains(".mdp-mark"));
     }
 
