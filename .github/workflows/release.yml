@@ -115,10 +115,26 @@ jobs:
     needs: [build-macos, build-windows, build-linux]
     runs-on: ubuntu-latest
     steps:
+      - uses: actions/checkout@v4
+
       - name: Download all artifacts
         uses: actions/download-artifact@v4
         with:
           merge-multiple: true
+
+      - name: Extract release notes
+        run: |
+          version="${GITHUB_REF_NAME#v}"
+          awk -v version="$version" '
+            $0 == "## " version { in_section = 1; next }
+            in_section && /^## / { exit }
+            in_section { print }
+          ' CHANGELOG.md | sed '/./,$!d' > RELEASE_NOTES.md
+          if [ ! -s RELEASE_NOTES.md ]; then
+            printf 'See full changelog: https://github.com/%s/compare/%s...%s\n' \
+              "$GITHUB_REPOSITORY" "$(git describe --tags --abbrev=0 HEAD^ 2>/dev/null || true)" "$GITHUB_REF_NAME" \
+              > RELEASE_NOTES.md
+          fi
 
       - name: Create Release
         uses: softprops/action-gh-release@v2
@@ -127,4 +143,4 @@ jobs:
             MD-Preview-macOS-universal.dmg
             MD-Preview-windows-x64.exe
             MD-Preview-linux-x64.tar.gz
-          generate_release_notes: true
+          body_path: RELEASE_NOTES.md
