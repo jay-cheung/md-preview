@@ -1,5 +1,11 @@
 # Changelog
 
+## mobile-android-v1.0.8
+
+- Fixed the Android in-app Open File picker so it requests Markdown MIME types instead of `*/*`, preventing non-Markdown files from appearing in broad Android file providers.
+- Added Android-side validation that rejects non-Markdown files before rendering if a provider still returns one.
+- Added release readiness checks to prevent the broad Android picker configuration from returning.
+
 ## 1.1.23
 
 - Fixed desktop print margins on macOS by adding an explicit `@page` margin to the rendered preview print stylesheet.

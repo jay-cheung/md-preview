@@ -46,6 +46,17 @@ public final class MainActivity extends Activity {
     private static final int OPEN_DOCUMENT_REQUEST = 7;
     private static final String RECENT_PREFS = "recent";
     private static final String RECENT_FILES = "files";
+    private static final String[] MARKDOWN_MIME_TYPES = new String[] {
+        "text/markdown",
+        "text/x-markdown",
+        "text/md",
+        "text/vnd.daringfireball.markdown",
+        "application/markdown",
+        "application/x-markdown",
+        "application/md",
+        "application/x-md",
+        "application/vnd.daringfireball.markdown"
+    };
     private WebView webView;
     private Uri pendingUri;
 
@@ -76,6 +87,10 @@ public final class MainActivity extends Activity {
         if (requestCode == OPEN_DOCUMENT_REQUEST && resultCode == RESULT_OK && data != null) {
             Uri uri = data.getData();
             if (uri != null) {
+                if (!isMarkdownDocument(uri)) {
+                    showUnsupportedFile(uri);
+                    return;
+                }
                 persistReadPermission(uri, data.getFlags());
                 openUri(uri);
             }
@@ -157,6 +172,10 @@ public final class MainActivity extends Activity {
 
     private void openUri(Uri uri, boolean fromRecent) {
         try {
+            if (!isMarkdownDocument(uri)) {
+                showUnsupportedFile(uri);
+                return;
+            }
             byte[] bytes = readBytes(uri);
             String markdown = decodeMarkdown(bytes);
             String name = displayName(uri);
@@ -259,6 +278,41 @@ public final class MainActivity extends Activity {
         return slash >= 0 ? path.substring(slash + 1) : path;
     }
 
+    private boolean isMarkdownDocument(Uri uri) {
+        String name = safeDisplayName(uri).toLowerCase(java.util.Locale.ROOT);
+        if (name.endsWith(".md")
+            || name.endsWith(".markdown")
+            || name.endsWith(".mdown")
+            || name.endsWith(".mkd")) {
+            return true;
+        }
+
+        String mimeType = getContentResolver().getType(uri);
+        if (mimeType == null) {
+            return false;
+        }
+        String normalized = mimeType.toLowerCase(java.util.Locale.ROOT);
+        for (String markdownMimeType : MARKDOWN_MIME_TYPES) {
+            if (markdownMimeType.equals(normalized)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private void showUnsupportedFile(Uri uri) {
+        String name = safeDisplayName(uri);
+        JSONObject payload = new JSONObject();
+        try {
+            payload.put("markdown", "Cannot open non-Markdown file: " + name);
+            payload.put("name", "Unsupported file.md");
+            payload.put("baseHref", "");
+        } catch (JSONException ignored) {
+        }
+        Toast.makeText(this, "Choose a Markdown file", Toast.LENGTH_SHORT).show();
+        evaluate("window.MDPreview && window.MDPreview.render(" + payload + ");");
+    }
+
     private String baseHref(Uri uri) {
         String text = uri.toString();
         int slash = text.lastIndexOf('/');
@@ -269,13 +323,8 @@ public final class MainActivity extends Activity {
     private void openDocumentPicker() {
         Intent intent = new Intent(Intent.ACTION_OPEN_DOCUMENT);
         intent.addCategory(Intent.CATEGORY_OPENABLE);
-        intent.setType("*/*");
-        intent.putExtra(Intent.EXTRA_MIME_TYPES, new String[] {
-            "text/markdown",
-            "text/x-markdown",
-            "text/plain",
-            "application/octet-stream"
-        });
+        intent.setType("text/markdown");
+        intent.putExtra(Intent.EXTRA_MIME_TYPES, MARKDOWN_MIME_TYPES);
         intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION | Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION);
         try {
             startActivityForResult(intent, OPEN_DOCUMENT_REQUEST);

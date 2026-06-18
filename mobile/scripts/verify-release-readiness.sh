@@ -23,6 +23,16 @@ plutil -lint mobile/ios/MDPreviewMobile/Info.plist mobile/ios/MDPreviewMobile/Pr
 python3 -m json.tool mobile/ios/MDPreviewMobile/Assets.xcassets/Contents.json >/dev/null
 python3 -m json.tool mobile/ios/MDPreviewMobile/Assets.xcassets/AppIcon.appiconset/Contents.json >/dev/null
 
+ANDROID_ACTIVITY="mobile/android/app/src/main/java/app/mdpreview/mobile/MainActivity.java"
+grep -F 'intent.setType("text/markdown")' "$ANDROID_ACTIVITY" >/dev/null || fail "Android Open File picker must request Markdown MIME"
+if grep -F 'intent.setType("*/*")' "$ANDROID_ACTIVITY" >/dev/null; then
+  fail "Android Open File picker must not request */*"
+fi
+if sed -n '/private void openDocumentPicker()/,/startActivityForResult/p' "$ANDROID_ACTIVITY" | grep -F 'application/octet-stream' >/dev/null; then
+  fail "Android Open File picker must not use application/octet-stream"
+fi
+grep -F 'isMarkdownDocument(uri)' "$ANDROID_ACTIVITY" >/dev/null || fail "Android Open File must validate selected documents"
+
 echo "[release-readiness] Android release build"
 (
   cd mobile/android
