@@ -1,5 +1,10 @@
 # Changelog
 
+## mobile-android-v1.0.9
+
+- Changed the Android in-app Open File picker to request `text/*` with Markdown-related MIME hints so OEM file pickers that do not recognize `text/markdown` do not fall back to showing every recent file type.
+- Kept the app-side Markdown validation from `1.0.8`, so selected non-Markdown files are still rejected before rendering.
+
 ## mobile-android-v1.0.8
 
 - Fixed the Android in-app Open File picker so it requests Markdown MIME types instead of `*/*`, preventing non-Markdown files from appearing in broad Android file providers.

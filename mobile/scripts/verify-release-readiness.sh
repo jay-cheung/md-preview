@@ -24,7 +24,7 @@ python3 -m json.tool mobile/ios/MDPreviewMobile/Assets.xcassets/Contents.json >/
 python3 -m json.tool mobile/ios/MDPreviewMobile/Assets.xcassets/AppIcon.appiconset/Contents.json >/dev/null
 
 ANDROID_ACTIVITY="mobile/android/app/src/main/java/app/mdpreview/mobile/MainActivity.java"
-grep -F 'intent.setType("text/markdown")' "$ANDROID_ACTIVITY" >/dev/null || fail "Android Open File picker must request Markdown MIME"
+grep -F 'intent.setType("text/*")' "$ANDROID_ACTIVITY" >/dev/null || fail "Android Open File picker must request text MIME"
 if grep -F 'intent.setType("*/*")' "$ANDROID_ACTIVITY" >/dev/null; then
   fail "Android Open File picker must not request */*"
 fi

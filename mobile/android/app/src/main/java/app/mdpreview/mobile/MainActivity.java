@@ -57,6 +57,18 @@ public final class MainActivity extends Activity {
         "application/x-md",
         "application/vnd.daringfireball.markdown"
     };
+    private static final String[] PICKER_MIME_TYPES = new String[] {
+        "text/markdown",
+        "text/x-markdown",
+        "text/md",
+        "text/vnd.daringfireball.markdown",
+        "text/plain",
+        "application/markdown",
+        "application/x-markdown",
+        "application/md",
+        "application/x-md",
+        "application/vnd.daringfireball.markdown"
+    };
     private WebView webView;
     private Uri pendingUri;
 
@@ -323,8 +335,8 @@ public final class MainActivity extends Activity {
     private void openDocumentPicker() {
         Intent intent = new Intent(Intent.ACTION_OPEN_DOCUMENT);
         intent.addCategory(Intent.CATEGORY_OPENABLE);
-        intent.setType("text/markdown");
-        intent.putExtra(Intent.EXTRA_MIME_TYPES, MARKDOWN_MIME_TYPES);
+        intent.setType("text/*");
+        intent.putExtra(Intent.EXTRA_MIME_TYPES, PICKER_MIME_TYPES);
         intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION | Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION);
         try {
             startActivityForResult(intent, OPEN_DOCUMENT_REQUEST);
