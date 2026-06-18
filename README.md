@@ -13,7 +13,7 @@
 
 MD Preview is a fast, local-first Markdown viewer built with **Rust** and the system **WebView** on desktop, plus native iOS and Android shells for opening Markdown from Files, WeChat, WeCom, and system share sheets. It does not bundle Chromium, does not require Electron, and keeps all rendering assets offline. Drop in a Markdown file, open one from the terminal, or keep it beside Cursor, Claude Code, Codex, VS Code, Vim, Zed, or any editor that writes Markdown.
 
-![MD Preview screenshot](https://raw.githubusercontent.com/vorojar/md-preview/master/screenshots/hero.jpg)
+![MD Preview screenshot](https://vorojar.github.io/md-preview/hero.jpg)
 
 ## Why It Exists
 

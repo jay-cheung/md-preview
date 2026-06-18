@@ -13,7 +13,7 @@
 
 MD Preview 是用 **Rust** 和系统 **WebView** 写的本地优先 Markdown 预览工具，桌面端覆盖 macOS、Windows、Linux，手机端提供 iOS 和 Android 原生外壳，方便从文件管理器、微信、企业微信和系统分享面板打开 Markdown。它不打包 Chromium，不依赖 Electron，渲染资源全部离线内置。你可以拖入文件、从命令行打开文件，或者把它放在 Cursor、Claude Code、Codex、VS Code、Vim、Zed 等常用工具旁边，当一扇干净的预览窗口。
 
-![MD Preview 截图](https://raw.githubusercontent.com/vorojar/md-preview/master/screenshots/hero.jpg)
+![MD Preview 截图](https://vorojar.github.io/md-preview/hero.jpg)
 
 ## 为什么做它
 
