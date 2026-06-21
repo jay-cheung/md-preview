@@ -7,6 +7,7 @@ use notify::{Event, RecursiveMode, Watcher};
 use pulldown_cmark::{html, CowStr, Event as MdEvent, Options, Parser, Tag, TagEnd};
 use std::collections::HashMap;
 use std::fs;
+use std::path::Component;
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
@@ -331,7 +332,12 @@ fn centered_geom(event_loop: &EventLoop<UserEvent>) -> WindowGeom {
     }
 }
 
+#[cfg(test)]
 fn md_to_html(md: &str) -> String {
+    md_to_html_with_base(md, None)
+}
+
+fn md_to_html_with_base(md: &str, base_dir: Option<&Path>) -> String {
     let opts = Options::ENABLE_TABLES
         | Options::ENABLE_STRIKETHROUGH
         | Options::ENABLE_TASKLISTS
@@ -339,10 +345,163 @@ fn md_to_html(md: &str) -> String {
         | Options::ENABLE_MATH
         | Options::ENABLE_GFM;
     let parser = Parser::new_ext(md, opts);
-    let events = add_mark_highlights(add_heading_ids(parser.collect()));
+    let events = embed_local_images(
+        add_mark_highlights(add_heading_ids(parser.collect())),
+        base_dir,
+    );
     let mut html_out = String::new();
     html::push_html(&mut html_out, events.into_iter());
     html_out
+}
+
+fn embed_local_images<'a>(events: Vec<MdEvent<'a>>, base_dir: Option<&Path>) -> Vec<MdEvent<'a>> {
+    let Some(base_dir) = base_dir else {
+        return events;
+    };
+
+    events
+        .into_iter()
+        .map(|event| match event {
+            MdEvent::Start(Tag::Image {
+                link_type,
+                dest_url,
+                title,
+                id,
+            }) => {
+                let embedded = local_image_data_url(base_dir, dest_url.as_ref());
+                MdEvent::Start(Tag::Image {
+                    link_type,
+                    dest_url: embedded.map(CowStr::from).unwrap_or(dest_url),
+                    title,
+                    id,
+                })
+            }
+            _ => event,
+        })
+        .collect()
+}
+
+fn local_image_data_url(base_dir: &Path, url: &str) -> Option<String> {
+    let image_path = resolve_local_relative_image_path(base_dir, url)?;
+    let mime = image_mime_type(&image_path)?;
+    let bytes = fs::read(image_path).ok()?;
+    Some(format!("data:{mime};base64,{}", base64_encode(&bytes)))
+}
+
+fn resolve_local_relative_image_path(base_dir: &Path, url: &str) -> Option<PathBuf> {
+    let path_part = url.split(['#', '?']).next()?.trim();
+    if !is_local_relative_url(path_part) {
+        return None;
+    }
+
+    let mut candidate = base_dir.to_path_buf();
+    for segment in path_part.split('/') {
+        if segment.is_empty() || segment == "." {
+            continue;
+        }
+        let decoded = percent_decode_path_segment(segment)?;
+        let segment_path = Path::new(&decoded);
+        if segment_path
+            .components()
+            .any(|component| !matches!(component, Component::Normal(_)))
+        {
+            return None;
+        }
+        candidate.push(segment_path);
+    }
+
+    if candidate == base_dir {
+        return None;
+    }
+    Some(candidate)
+}
+
+fn is_local_relative_url(url: &str) -> bool {
+    !url.is_empty()
+        && !url.starts_with('#')
+        && !url.starts_with('/')
+        && !url.starts_with('\\')
+        && !url.starts_with("//")
+        && !url.contains(':')
+}
+
+fn percent_decode_path_segment(segment: &str) -> Option<String> {
+    let bytes = segment.as_bytes();
+    let mut out = Vec::with_capacity(bytes.len());
+    let mut i = 0;
+    while i < bytes.len() {
+        if bytes[i] == b'%' {
+            let hi = bytes.get(i + 1).and_then(|b| hex_value(*b))?;
+            let lo = bytes.get(i + 2).and_then(|b| hex_value(*b))?;
+            out.push((hi << 4) | lo);
+            i += 3;
+        } else {
+            out.push(bytes[i]);
+            i += 1;
+        }
+    }
+    String::from_utf8(out).ok()
+}
+
+fn hex_value(byte: u8) -> Option<u8> {
+    match byte {
+        b'0'..=b'9' => Some(byte - b'0'),
+        b'a'..=b'f' => Some(byte - b'a' + 10),
+        b'A'..=b'F' => Some(byte - b'A' + 10),
+        _ => None,
+    }
+}
+
+fn image_mime_type(path: &Path) -> Option<&'static str> {
+    match path
+        .extension()?
+        .to_string_lossy()
+        .to_ascii_lowercase()
+        .as_str()
+    {
+        "png" => Some("image/png"),
+        "jpg" | "jpeg" => Some("image/jpeg"),
+        "gif" => Some("image/gif"),
+        "webp" => Some("image/webp"),
+        "svg" => Some("image/svg+xml"),
+        "bmp" => Some("image/bmp"),
+        "ico" => Some("image/x-icon"),
+        "avif" => Some("image/avif"),
+        _ => None,
+    }
+}
+
+fn base64_encode(bytes: &[u8]) -> String {
+    const TABLE: &[u8; 64] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+    let mut out = String::with_capacity(((bytes.len() + 2) / 3) * 4);
+    let mut chunks = bytes.chunks_exact(3);
+    for chunk in &mut chunks {
+        let n = ((chunk[0] as u32) << 16) | ((chunk[1] as u32) << 8) | chunk[2] as u32;
+        out.push(TABLE[((n >> 18) & 0x3f) as usize] as char);
+        out.push(TABLE[((n >> 12) & 0x3f) as usize] as char);
+        out.push(TABLE[((n >> 6) & 0x3f) as usize] as char);
+        out.push(TABLE[(n & 0x3f) as usize] as char);
+    }
+
+    match chunks.remainder() {
+        [a] => {
+            let n = (*a as u32) << 16;
+            out.push(TABLE[((n >> 18) & 0x3f) as usize] as char);
+            out.push(TABLE[((n >> 12) & 0x3f) as usize] as char);
+            out.push('=');
+            out.push('=');
+        }
+        [a, b] => {
+            let n = ((*a as u32) << 16) | ((*b as u32) << 8);
+            out.push(TABLE[((n >> 18) & 0x3f) as usize] as char);
+            out.push(TABLE[((n >> 12) & 0x3f) as usize] as char);
+            out.push(TABLE[((n >> 6) & 0x3f) as usize] as char);
+            out.push('=');
+        }
+        _ => {}
+    }
+
+    out
 }
 
 fn add_mark_highlights<'a>(events: Vec<MdEvent<'a>>) -> Vec<MdEvent<'a>> {
@@ -1677,6 +1836,18 @@ fn event_should_reload_file(ev: &Event, target: &Path) -> bool {
 mod tests {
     use super::*;
     use notify::EventKind;
+    use std::time::{SystemTime, UNIX_EPOCH};
+
+    fn temp_test_dir(name: &str) -> PathBuf {
+        let unique = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_nanos();
+        let dir =
+            std::env::temp_dir().join(format!("md-preview-{name}-{}-{unique}", std::process::id()));
+        fs::create_dir_all(&dir).unwrap();
+        dir
+    }
 
     #[test]
     fn dollar_math_is_protected_from_markdown_escapes() {
@@ -1709,6 +1880,40 @@ mod tests {
 
         assert!(html.contains(r#"Use <mark class="mdp-mark">highlight &amp; tag</mark> here"#));
         assert!(html.contains("<code>==literal==</code>"));
+    }
+
+    #[test]
+    fn local_relative_images_are_embedded_from_markdown_directory() {
+        let dir = temp_test_dir("local-image");
+        let assets = dir.join("assets");
+        fs::create_dir_all(&assets).unwrap();
+        fs::write(assets.join("pixel.png"), b"abc").unwrap();
+
+        let html = md_to_html_with_base("![pixel](assets/pixel.png)", Some(&dir));
+
+        assert!(html.contains(r#"<img src="data:image/png;base64,YWJj" alt="pixel" />"#));
+        let _ = fs::remove_dir_all(dir);
+    }
+
+    #[test]
+    fn local_relative_images_keep_original_src_when_unreadable() {
+        let dir = temp_test_dir("missing-image");
+
+        let html = md_to_html_with_base("![missing](assets/missing.png)", Some(&dir));
+
+        assert!(html.contains(r#"<img src="assets/missing.png" alt="missing" />"#));
+        let _ = fs::remove_dir_all(dir);
+    }
+
+    #[test]
+    fn local_relative_images_do_not_embed_parent_traversal() {
+        let dir = temp_test_dir("traversal-image");
+
+        let html = md_to_html_with_base("![secret](../secret.png)", Some(&dir));
+
+        assert!(html.contains(r#"<img src="../secret.png" alt="secret" />"#));
+        assert!(!html.contains("data:image/png"));
+        let _ = fs::remove_dir_all(dir);
     }
 
     #[test]
@@ -1781,7 +1986,8 @@ mod tests {
         assert!(page.contains("update-check-result:available"));
         assert!(page.contains("update-check-result:"));
         assert!(page.contains("Cmd/Ctrl+F"));
-        assert!(page.contains("if (inEdit()) return;\n\t      e.preventDefault();\n\t      showFind();"));
+        assert!(page
+            .contains("if (inEdit()) return;\n\t      e.preventDefault();\n\t      showFind();"));
         assert!(page.contains("body.editing #btn-open"));
         assert!(page.contains("ta.focus({ preventScroll: true })"));
         assert!(page.contains("window.__setEmptyPreview"));
@@ -2948,7 +3154,7 @@ fn main() {
                 )
             },
             |raw| {
-                let html_body = md_to_html(&raw);
+                let html_body = md_to_html_with_base(&raw, path.parent());
                 let base_href = base_href_for_file(path);
                 initial_flags = enhance_flags_for(&raw);
                 build_page(
@@ -3197,7 +3403,7 @@ fn main() {
                 if let Some(ref path) = fp {
                     if let Ok(raw) = fs::read_to_string(path) {
                         remember_recent_file(&recent_files, path);
-                        let html = md_to_html(&raw);
+                        let html = md_to_html_with_base(&raw, path.parent());
                         let base_href = base_href_for_file(path).unwrap_or_default();
                         let flags = enhance_flags_for(&raw);
                         *enhance_flags.lock().unwrap() = flags;
@@ -3255,7 +3461,7 @@ fn main() {
                 let fp = file_path_for_event.lock().unwrap().clone();
                 if let Some(ref path) = fp {
                     if let Ok(raw) = fs::read_to_string(path) {
-                        let html = md_to_html(&raw);
+                        let html = md_to_html_with_base(&raw, path.parent());
                         let flags = enhance_flags_for(&raw);
                         *enhance_flags.lock().unwrap() = flags;
                         let js = format!(

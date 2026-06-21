@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.1.24
+
+- Fixed local relative image rendering on desktop: images such as `assets/foo.png` next to the opened Markdown file are embedded into the preview instead of relying on WebView local file access.
+- Kept missing images, absolute paths, network images, and parent-directory traversal paths unchanged.
+- Added regression coverage for embedded local images, missing local images, and rejected parent traversal paths.
+
 ## mobile-android-v1.0.9
 
 - Changed the Android in-app Open File picker to request `text/*` with Markdown-related MIME hints so OEM file pickers that do not recognize `text/markdown` do not fall back to showing every recent file type.
